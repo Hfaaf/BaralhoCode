@@ -4,97 +4,141 @@ export function useBlackjack() {
   const [deckId, setDeckId] = useState(null);
   const [playerCards, setPlayerCards] = useState([]);
   const [dealerCards, setDealerCards] = useState([]);
+  const [turn, setTurn] = useState("player"); // controla vez
   const [gameOver, setGameOver] = useState(false);
   const [message, setMessage] = useState("");
   const [revealDealer, setRevealDealer] = useState(false);
 
-  const calcScore = (cards) => {
-    let total = 0;
+  // cria baralho
+  async function startGame() {
+    const deck = await fetch(
+      "https://deckofcardsapi.com/api/deck/new/shuffle/?deck_count=1"
+    ).then((r) => r.json());
+
+    setDeckId(deck.deck_id);
+    setPlayerCards([]);
+    setDealerCards([]);
+    setMessage("");
+    setGameOver(false);
+    setRevealDealer(false);
+    setTurn("player");
+
+    // distribui cartas iniciais
+    const p = await draw(deck.deck_id, 2);
+    const d = await draw(deck.deck_id, 2);
+    setPlayerCards(p);
+    setDealerCards(d);
+  }
+
+  // puxar cartas da API
+  async function draw(deckId, count) {
+    const data = await fetch(
+      `https://deckofcardsapi.com/api/deck/${deckId}/draw/?count=${count}`
+    ).then((r) => r.json());
+    return data.cards;
+  }
+
+  // calcula score
+  function calcScore(cards) {
+    let score = 0;
     let aces = 0;
 
     cards.forEach((c) => {
-      if (["KING", "QUEEN", "JACK"].includes(c.value)) total += 10;
-      else if (c.value === "ACE") {
-        total += 11;
-        aces++;
+      if (["KING", "QUEEN", "JACK"].includes(c.value)) {
+        score += 10;
+      } else if (c.value === "ACE") {
+        aces += 1;
+        score += 11;
       } else {
-        total += parseInt(c.value);
+        score += parseInt(c.value);
       }
     });
 
-    while (total > 21 && aces > 0) {
-      total -= 10;
-      aces--;
+    while (score > 21 && aces > 0) {
+      score -= 10;
+      aces -= 1;
     }
 
-    return total;
-  };
+    return score;
+  }
 
-  const startGame = async () => {
-    const res = await fetch(
-      "https://deckofcardsapi.com/api/deck/new/shuffle/?deck_count=1"
-    );
-    const data = await res.json();
-    setDeckId(data.deck_id);
+  // turno do jogador: hit
+  async function hit() {
+    if (turn !== "player" || gameOver) return;
 
-    const draw = await fetch(
-      `https://deckofcardsapi.com/api/deck/${data.deck_id}/draw/?count=4`
-    );
-    const hand = await draw.json();
-
-    setPlayerCards([hand.cards[0], hand.cards[2]]);
-    setDealerCards([hand.cards[1], hand.cards[3]]);
-
-    setGameOver(false);
-    setMessage("");
-    setRevealDealer(false);
-  };
-
-  const hit = async () => {
-    if (!deckId || gameOver || revealDealer) return;
-
-    const res = await fetch(
-      `https://deckofcardsapi.com/api/deck/${deckId}/draw/?count=1`
-    );
-    const data = await res.json();
-
-    const newHand = [...playerCards, data.cards[0]];
+    const card = await draw(deckId, 1);
+    const newHand = [...playerCards, ...card];
     setPlayerCards(newHand);
 
     if (calcScore(newHand) > 21) {
+      setMessage("Você estourou! Dealer venceu 😢");
       setGameOver(true);
       setRevealDealer(true);
-      setMessage("💥 Você estourou! Dealer vence.");
+    } else {
+      // passa a vez para o dealer
+      setTurn("dealer");
+      dealerTurn();
     }
-  };
+  }
 
-  const stand = async () => {
+  // turno do jogador: stand
+  function stand() {
+    if (turn !== "player" || gameOver) return;
+    setTurn("dealer");
     setRevealDealer(true);
+    dealerTurn(true); // agora dealer joga até o fim
+  }
 
-    let dealerHand = [...dealerCards];
-    let dealerScore = calcScore(dealerHand);
+  // turno do dealer
+  async function dealerTurn(final = false) {
+    setTimeout(async () => {
+      const score = calcScore(dealerCards);
+      const playerScore = calcScore(playerCards);
 
-    while (dealerScore < 17) {
-      const res = await fetch(
-        `https://deckofcardsapi.com/api/deck/${deckId}/draw/?count=1`
-      );
-      const data = await res.json();
+      // lógica da IA:
+      // se final == false → dealer só responde com UMA carta
+      // se final == true → dealer joga até 17+
+      if (final) {
+        if (score < 17) {
+          const card = await draw(deckId, 1);
+          const newHand = [...dealerCards, ...card];
+          setDealerCards(newHand);
+          dealerTurn(true);
+          return;
+        }
+      } else {
+        if (score < playerScore && score < 21) {
+          const card = await draw(deckId, 1);
+          const newHand = [...dealerCards, ...card];
+          setDealerCards(newHand);
+        }
+      }
 
-      dealerHand.push(data.cards[0]);
-      dealerScore = calcScore(dealerHand);
-    }
+      // verifica fim
+      if (final) {
+        endGame();
+      } else {
+        setTurn("player");
+      }
+    }, 1000); // 1s para parecer mais "turno"
+  }
 
-    setDealerCards(dealerHand);
-
+  // fim de jogo
+  function endGame() {
+    const dealerScore = calcScore(dealerCards);
     const playerScore = calcScore(playerCards);
 
-    if (dealerScore > 21) setMessage("🔥 Dealer estourou! Você vence.");
-    else if (dealerScore > playerScore) setMessage("🏆 Dealer vence!");
-    else if (dealerScore < playerScore) setMessage("🎉 Você venceu!");
-    else setMessage("🤝 Empate!");
-
+    setRevealDealer(true);
     setGameOver(true);
-  };
+
+    if (dealerScore > 21 || playerScore > dealerScore) {
+      setMessage("Você venceu! 🎉");
+    } else if (dealerScore === playerScore) {
+      setMessage("Empate! 🤝");
+    } else {
+      setMessage("Dealer venceu! 😈");
+    }
+  }
 
   return {
     deckId,
@@ -107,5 +151,6 @@ export function useBlackjack() {
     stand,
     calcScore,
     revealDealer,
+    turn,
   };
 }
