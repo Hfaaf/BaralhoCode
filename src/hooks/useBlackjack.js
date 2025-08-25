@@ -9,7 +9,6 @@ export function useBlackjack() {
   const [message, setMessage] = useState("");
   const [revealDealer, setRevealDealer] = useState(false);
 
-  // cria baralho
   async function startGame() {
     const deck = await fetch(
       "https://deckofcardsapi.com/api/deck/new/shuffle/?deck_count=1"
@@ -23,14 +22,12 @@ export function useBlackjack() {
     setRevealDealer(false);
     setTurn("player");
 
-    // distribui cartas iniciais
     const p = await draw(deck.deck_id, 2);
     const d = await draw(deck.deck_id, 2);
     setPlayerCards(p);
     setDealerCards(d);
   }
 
-  // puxar cartas da API
   async function draw(deckId, count) {
     const data = await fetch(
       `https://deckofcardsapi.com/api/deck/${deckId}/draw/?count=${count}`
@@ -38,7 +35,6 @@ export function useBlackjack() {
     return data.cards;
   }
 
-  // calcula score
   function calcScore(cards) {
     let score = 0;
     let aces = 0;
@@ -62,7 +58,6 @@ export function useBlackjack() {
     return score;
   }
 
-  // turno do jogador: hit
   async function hit() {
     if (turn !== "player" || gameOver) return;
 
@@ -71,33 +66,28 @@ export function useBlackjack() {
     setPlayerCards(newHand);
 
     if (calcScore(newHand) > 21) {
-      setMessage("Você estourou! Dealer venceu 😢");
+      setMessage("Você estourou!");
       setGameOver(true);
       setRevealDealer(true);
     } else {
-      // passa a vez para o dealer
       setTurn("dealer");
       dealerTurn();
     }
   }
 
-  // turno do jogador: stand
   function stand() {
     if (turn !== "player" || gameOver) return;
     setTurn("dealer");
     setRevealDealer(true);
-    dealerTurn(true); // agora dealer joga até o fim
+    dealerTurn(true);
   }
 
-  // turno do dealer
   async function dealerTurn(final = false) {
     setTimeout(async () => {
       const score = calcScore(dealerCards);
       const playerScore = calcScore(playerCards);
 
-      // lógica da IA:
-      // se final == false → dealer só responde com UMA carta
-      // se final == true → dealer joga até 17+
+
       if (final) {
         if (score < 17) {
           const card = await draw(deckId, 1);
@@ -113,17 +103,14 @@ export function useBlackjack() {
           setDealerCards(newHand);
         }
       }
-
-      // verifica fim
       if (final) {
         endGame();
       } else {
         setTurn("player");
       }
-    }, 1000); // 1s para parecer mais "turno"
+    }, 1000);
   }
 
-  // fim de jogo
   function endGame() {
     const dealerScore = calcScore(dealerCards);
     const playerScore = calcScore(playerCards);
@@ -132,11 +119,11 @@ export function useBlackjack() {
     setGameOver(true);
 
     if (dealerScore > 21 || playerScore > dealerScore) {
-      setMessage("Você venceu! 🎉");
+      setMessage("Você venceu!");
     } else if (dealerScore === playerScore) {
-      setMessage("Empate! 🤝");
+      setMessage("Empate!");
     } else {
-      setMessage("Dealer venceu! 😈");
+      setMessage("O outro jogador venceu!");
     }
   }
 
