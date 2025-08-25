@@ -19,7 +19,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col items-center p-6 bg-green-900 min-h-screen text-white">
-      <h1 className="text-3xl font-bold mb-4">♠️ Blackjack</h1>
+      <h1 className="text-3xl font-bold mb-4">vinte-e-um</h1>
 
       <Controls
         start={startGame}
