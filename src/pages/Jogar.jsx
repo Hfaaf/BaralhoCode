@@ -39,7 +39,19 @@ export default function Jogar() {
   const [turn, setTurn] = useState("player");
   const [revealDealer, setRevealDealer] = useState(false);
   const [playerStopped, setPlayerStopped] = useState(false);
-  const [dealerStopped, setDealerStopped] = useState(false);
+
+  function resetGame() {
+    setStarted(false);
+    setGameOver(false);
+    setMessage("");
+    setDeckId(null);
+    setPlayerCards([]);
+    setDealerCards([]);
+    setTurn("player");
+    setRevealDealer(false);
+    setPlayerStopped(false);
+    setDealerPlaying(false);
+  }
 
   async function startGame() {
     setLoading(true);
@@ -49,7 +61,6 @@ export default function Jogar() {
     setRevealDealer(false);
     setTurn("player");
     setPlayerStopped(false);
-    setDealerStopped(false);
     const deckRes = await fetch(`${API}/new/shuffle/?deck_count=1`);
     const deckData = await deckRes.json();
     setDeckId(deckData.deck_id);
@@ -81,88 +92,71 @@ export default function Jogar() {
       setMessage("Você perdeu!");
       setGameOver(true);
       setRevealDealer(true);
-    } else {
-      setTurn("dealer");
-      setTimeout(() => dealerTurn(), 700);
     }
   }
 
-  function stand() {
-  if (gameOver || turn !== "player" || playerStopped) return;
-  setPlayerStopped(true);
-  setTurn("dealer");
-
-  if (dealerStopped) {
-    endGame(dealerCards);
-  } else {
-    dealerTurn();
+  async function stand() {
+    if (gameOver || turn !== "player" || playerStopped) return;
+    
+    setPlayerStopped(true);
+    setTurn("dealer");
+    setRevealDealer(true);
+    
+    await dealerTurn();
   }
-}
-
 
   async function dealerTurn() {
-  if (gameOver) return;
+    if (gameOver) return;
+    
+    setDealerPlaying(true);
+    
+    const levelMap = { easy: 17, medium: 18, hard: 19 };
+    const dealerLimit = levelMap[iaLevel] || 17;
+    
+    let currentHand = [...dealerCards];
+    let currentScore = score(currentHand);
 
-  setDealerPlaying(true);
-
-  const levelMap = { easy: 17, medium: 18, hard: 19 };
-  const dealerLimit = levelMap[iaLevel] || 17;
-
-  let hand = [...dealerCards];
-
-  while (true) {
-    const dScore = score(hand);
-
-    if (dScore > 21) {
-      setDealerCards(hand);
-      setMessage("Dealer estourou! Você venceu!");
-      setRevealDealer(true);
-      setGameOver(true);
-      setDealerPlaying(false);
-      setDealerStopped(true);
-      return;
-    }
-
-    if (dScore >= dealerLimit) {
-      setDealerCards(hand);
-      setDealerPlaying(false);
-      setDealerStopped(true);
-
-      if (playerStopped) {
-        endGame(hand);
-      } else {
-          setTurn("player");
+    while (currentScore < dealerLimit && currentScore <= 21) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const newCard = await draw(deckId, 1);
+      currentHand = [...currentHand, ...newCard];
+      setDealerCards(currentHand);
+      
+      currentScore = score(currentHand);
+      
+      if (currentScore > 21) {
+        setMessage("Dealer estourou! Você venceu!");
+        setGameOver(true);
+        setDealerPlaying(false);
+        return;
       }
-      return;
     }
-    const next = await draw(deckId, 1);
-    hand = [...hand, ...next];
-    setDealerCards(hand);
-
-    if (!playerStopped) {
-      setDealerPlaying(false);
-      setTurn("player");
-      return;
-    }
+    
+    setDealerPlaying(false);
+    endGame(currentHand);
   }
-}
-
 
   function endGame(dealerHand = dealerCards) {
     const playerScore = score(playerCards);
     const dealerScore = score(dealerHand);
     let msg = "";
-    if (playerScore > 21) msg = "Você perdeu!";
-    else if (dealerScore > 21) msg = "Dealer estourou! Você venceu!";
-    else if (playerScore > dealerScore) msg = "Você venceu!";
-    else if (playerScore < dealerScore) msg = "Dealer venceu!";
-    else msg = "Empate!";
+    
+    if (playerScore > 21) {
+      msg = "Você perdeu!";
+    } else if (dealerScore > 21) {
+      msg = "Dealer estourou! Você venceu!";
+    } else if (playerScore > dealerScore) {
+      msg = "Você venceu!";
+    } else if (playerScore < dealerScore) {
+      msg = "Dealer venceu!";
+    } else {
+      msg = "Empate!";
+    }
 
-    setRevealDealer(true);
     setMessage(msg);
     setGameOver(true);
   }
-
 
   function ScoreBoard({ title, cards, score, hidden, hideAll }) {
     return (
@@ -178,8 +172,8 @@ export default function Jogar() {
                 hideAll
                   ? "https://deckofcardsapi.com/static/img/back.png"
                   : hidden
-                    ? "https://deckofcardsapi.com/static/img/back.png"
-                    : card.image
+                  ? "https://deckofcardsapi.com/static/img/back.png"
+                  : card.image
               }
               alt={card.value}
               className="w-16 h-24 rounded shadow"
@@ -214,7 +208,7 @@ export default function Jogar() {
   }
 
   return (
-    <div className="min-h-screen pt-24 pb-28 flex items-center justify-center bg-gradient-to-b from-blue-950 via-indigo-950 to-purple-950">
+    <div className="min-h-screen pt-48 pb-40 flex items-center justify-center bg-gradient-to-b from-blue-950 via-indigo-950 to-purple-950">
       <div className="w-full max-w-xl">
         <h1 className="text-3xl font-bold text-white mb-6 drop-shadow-lg text-center">Jogar vinte-e-um</h1>
         {loading && (
@@ -262,7 +256,7 @@ export default function Jogar() {
                 cards={dealerCards}
                 score={score(dealerCards)}
                 hidden={!revealDealer}
-                hideAll={turn === "dealer" && dealerPlaying}
+                hideAll={dealerPlaying}
               />
               <ScoreBoard
                 title="Suas cartas"
@@ -283,10 +277,20 @@ export default function Jogar() {
                     gameOver ||
                     turn !== "player" ||
                     loading ||
-                    playerStopped
+                    playerStopped ||
+                    dealerPlaying
                   }
                 />
               </div>
+              
+              {gameOver && (
+                <button
+                  onClick={resetGame}
+                  className="mt-4 px-6 py-3 rounded-xl bg-orange-600 text-white font-bold shadow-lg transition hover:bg-orange-700"
+                >
+                  Jogar Novamente
+                </button>
+              )}
             </div>
           )
         )}

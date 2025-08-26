@@ -1,6 +1,6 @@
 export default function ComoJogar() {
   return (
-    <div className="min-h-screen pt-24 pb-28 flex items-center justify-center bg-gradient-to-b from-blue-950 via-indigo-950 to-purple-950">
+    <div className="min-h-screen pt-48 pb-40 flex items-center justify-center bg-gradient-to-b from-blue-950 via-indigo-950 to-purple-950">
       <div className="max-w-lg w-full bg-white/10 rounded-2xl shadow-lg p-4 sm:p-8 mx-2">
         <h1 className="text-2xl sm:text-3xl font-bold text-white mb-4 sm:mb-6 text-center">Como Jogar Vinte-e-Um</h1>
         <div className="text-white text-base sm:text-lg leading-relaxed space-y-3 sm:space-y-4">
@@ -54,5 +54,5 @@ export default function ComoJogar() {
         </div>
       </div>
     </div>
-  );
+  )
 }

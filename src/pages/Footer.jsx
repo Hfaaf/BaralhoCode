@@ -1,4 +1,4 @@
-import { TbCards } from "react-icons/tb";
+import { TbCards } from "react-icons/tb"
 
 export default function Footer() {
     return (
@@ -10,6 +10,9 @@ export default function Footer() {
                             Feito por <span className="text-blue-300">Heitor Farias</span>
                         </span>
                         <span className="hidden sm:inline-block text-gray-300">|</span>
+                        <span className="text-gray-300 text-xs sm:text-sm italic text-center sm:text-left">
+                            Atividade:
+                        </span>
                         <span className="text-gray-300 text-xs sm:text-sm italic text-center sm:text-left">
                             Meu primeiro web app conectado
                         </span>
@@ -28,5 +31,5 @@ export default function Footer() {
                 </div>
             </div>
         </footer>
-    );
+    )
 }

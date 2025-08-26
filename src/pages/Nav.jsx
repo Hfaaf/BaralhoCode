@@ -1,4 +1,4 @@
-import { GiCard10Spades } from "react-icons/gi";
+import { GiCard10Spades } from "react-icons/gi"
 
 export default function Nav({ setPage, page }) {
     return (
@@ -40,5 +40,5 @@ export default function Nav({ setPage, page }) {
                 </ul>
             </div>
         </nav>
-    );
+    )
 }
