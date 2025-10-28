@@ -11,10 +11,13 @@ export default function Footer() {
                         </span>
                         <span className="hidden sm:inline-block text-gray-300">|</span>
                         <span className="text-gray-300 text-xs sm:text-sm italic text-center sm:text-left">
-                            Atividade:
+                            Atividades:
                         </span>
                         <span className="text-gray-300 text-xs sm:text-sm italic text-center sm:text-left">
                             Meu primeiro web app conectado
+                        </span>
+                        <span className="text-gray-300 text-xs sm:text-sm italic text-center sm:text-left">
+                            PWA + Uso de recurso de Hardware + API
                         </span>
                     </div>
                     <div className="flex items-center space-x-2 mt-2 sm:mt-0 w-full sm:w-auto justify-center sm:justify-end">

@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { GiCardAceSpades } from "react-icons/gi";
+import { FaTrophy, FaFrown } from "react-icons/fa";
+
+import * as api from '../apiService'
 
 const IA_LEVELS = [
   { label: "Iniciante", value: "easy" },
@@ -39,6 +42,8 @@ export default function Jogar() {
   const [turn, setTurn] = useState("player");
   const [revealDealer, setRevealDealer] = useState(false);
   const [playerStopped, setPlayerStopped] = useState(false);
+  const [modalPoints, setModalPoints] = useState(null);
+  const [modalNegativePoints, setModalNegativePoints] = useState(null)
 
   function resetGame() {
     setStarted(false);
@@ -51,6 +56,9 @@ export default function Jogar() {
     setRevealDealer(false);
     setPlayerStopped(false);
     setDealerPlaying(false);
+    setIaLevel(null);
+    setModalPoints(null);
+    setModalNegativePoints(null)
   }
 
   async function startGame() {
@@ -82,83 +90,166 @@ export default function Jogar() {
     return data.cards;
   }
 
+  function enviarPontuacao(pontos) {
+    if (pontos !== 0) {
+      console.log(`Enviando ${pontos} pontos para a API...`);
+      api.postScore(pontos)
+        .then(() => {
+          console.log('API respondeu: Pontuação enviada com SUCESSO!');
+        })
+        .catch(err => {
+          console.error('API respondeu: FALHA ao enviar pontuação:', err.message);
+        });
+    } else {
+      console.log("Fim de jogo. Nenhum ponto a enviar.");
+    }
+  }
+
   async function hit() {
     if (gameOver || turn !== "player" || playerStopped) return;
     const card = await draw(deckId, 1);
     const newHand = [...playerCards, ...card];
     setPlayerCards(newHand);
+
     const playerScore = score(newHand);
     if (playerScore > 21) {
-      setMessage("Você perdeu!");
-      setGameOver(true);
-      setRevealDealer(true);
+      endGame(newHand, dealerCards);
     }
   }
 
   async function stand() {
     if (gameOver || turn !== "player" || playerStopped) return;
-    
+
     setPlayerStopped(true);
     setTurn("dealer");
-    setRevealDealer(true);
-    
+
     await dealerTurn();
   }
 
   async function dealerTurn() {
     if (gameOver) return;
-    
+
     setDealerPlaying(true);
-    
+
+
     const levelMap = { easy: 17, medium: 18, hard: 19 };
     const dealerLimit = levelMap[iaLevel] || 17;
-    
+
     let currentHand = [...dealerCards];
     let currentScore = score(currentHand);
 
     while (currentScore < dealerLimit && currentScore <= 21) {
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       const newCard = await draw(deckId, 1);
       currentHand = [...currentHand, ...newCard];
       setDealerCards(currentHand);
-      
+
       currentScore = score(currentHand);
-      
-      if (currentScore > 21) {
-        setMessage("Dealer estourou! Você venceu!");
-        setGameOver(true);
-        setDealerPlaying(false);
-        return;
-      }
     }
-    
+
     setDealerPlaying(false);
-    endGame(currentHand);
+    endGame(playerCards, currentHand);
   }
 
-  function endGame(dealerHand = dealerCards) {
-    const playerScore = score(playerCards);
-    const dealerScore = score(dealerHand);
+  function endGame(finalPlayerCards, finalDealerCards) {
+    if (gameOver) return;
+
+    const playerScore = score(finalPlayerCards);
+    const dealerScore = score(finalDealerCards);
     let msg = "";
-    
+
+    let pontuacaoFinalParaEnviar = 0;
+    const PONTOS_VITORIA = 100;
+    const PONTOS_EMPATE = 10;
+    const PONTOS_DERROTA = -50;
+
     if (playerScore > 21) {
-      msg = "Você perdeu!";
+      msg = "Você estourou! Dealer venceu!";
+      pontuacaoFinalParaEnviar = PONTOS_DERROTA;
     } else if (dealerScore > 21) {
       msg = "Dealer estourou! Você venceu!";
+      pontuacaoFinalParaEnviar = PONTOS_VITORIA;
     } else if (playerScore > dealerScore) {
       msg = "Você venceu!";
+      pontuacaoFinalParaEnviar = PONTOS_VITORIA;
     } else if (playerScore < dealerScore) {
       msg = "Dealer venceu!";
+      pontuacaoFinalParaEnviar = PONTOS_DERROTA;
     } else {
       msg = "Empate!";
+      pontuacaoFinalParaEnviar = PONTOS_EMPATE;
     }
 
     setMessage(msg);
     setGameOver(true);
+    setRevealDealer(true);
+    setTurn("");
+    setPlayerStopped(true);
+
+    console.log(`FIM DE JOGO: ${msg} | Player: ${playerScore} | Dealer: ${dealerScore}`);
+    enviarPontuacao(pontuacaoFinalParaEnviar);
+
+    if (pontuacaoFinalParaEnviar > 0) {
+      setModalPoints(pontuacaoFinalParaEnviar);
+    } else if (pontuacaoFinalParaEnviar < 0) setModalNegativePoints(pontuacaoFinalParaEnviar)
   }
 
-  function ScoreBoard({ title, cards, score, hidden, hideAll }) {
+  function PointsModal({ points, onClose }) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div className="bg-gray-800 text-white p-8 rounded-lg shadow-xl w-full max-w-sm text-center">
+          <FaTrophy className="text-yellow-400 text-6xl mx-auto mb-4" />
+
+          <h2 className="text-3xl font-bold mb-2">Parabéns!</h2>
+
+          <p className="text-xl text-gray-300 mb-6">
+            {points === 10 ? "Você empatou e ganhou" : "Você venceu e ganhou"}
+          </p>
+
+          <div className="text-5xl font-bold text-green-400 mb-8">
+            +{points} pontos
+          </div>
+
+          <button
+            onClick={onClose}
+            className="w-full px-6 py-3 rounded-xl bg-green-600 text-white font-bold shadow-lg transition hover:bg-green-700"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  function PointsModalNegativo({ points, onClose }) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div className="bg-gray-800 text-white p-8 rounded-lg shadow-xl w-full max-w-sm text-center">
+          <FaFrown className="text-red-400 text-6xl mx-auto mb-4" />
+
+          <h2 className="text-3xl font-bold mb-2">Que pena!</h2>
+
+          <p className="text-xl text-gray-300 mb-6">
+            Você perdeu esta rodada.
+          </p>
+
+          <div className="text-5xl font-bold text-red-400 mb-8">
+            {points} pontos
+          </div>
+
+          <button
+            onClick={onClose}
+            className="w-full px-6 py-3 rounded-xl bg-red-600 text-white font-bold shadow-lg transition hover:bg-red-700"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  function ScoreBoard({ title, cards, score, hidden }) {
     return (
       <div className="mb-4">
         <h2 className="text-lg font-bold text-white mb-2">
@@ -168,14 +259,13 @@ export default function Jogar() {
           {cards.map((card, idx) => (
             <img
               key={card.code + idx}
+
               src={
-                hideAll
-                  ? "https://deckofcardsapi.com/static/img/back.png"
-                  : hidden
+                hidden
                   ? "https://deckofcardsapi.com/static/img/back.png"
                   : card.image
               }
-              alt={card.value}
+              alt={hidden ? "Carta Virada" : card.value}
               className="w-16 h-24 rounded shadow"
             />
           ))}
@@ -209,6 +299,21 @@ export default function Jogar() {
 
   return (
     <div className="min-h-screen pt-48 pb-40 flex items-center justify-center bg-gradient-to-b from-blue-950 via-indigo-950 to-purple-950">
+
+      {modalPoints && (
+        <PointsModal
+          points={modalPoints}
+          onClose={() => setModalPoints(null)}
+        />
+      )}
+
+      {modalNegativePoints && (
+        <PointsModalNegativo
+          points={modalNegativePoints}
+          onClose={() => setModalNegativePoints(null)}
+        />
+      )}
+
       <div className="w-full max-w-xl">
         <h1 className="text-3xl font-bold text-white mb-6 drop-shadow-lg text-center">Jogar vinte-e-um</h1>
         {loading && (
@@ -248,7 +353,7 @@ export default function Jogar() {
             <div className="bg-white/10 rounded-2xl shadow-lg p-6 flex flex-col gap-8 items-center">
               <div className="mb-2 text-center">
                 <span className="text-white text-lg font-bold">
-                  Turno: {turn === "player" ? "Você" : "Dealer"}
+                  Turno: {turn === "player" ? "Você" : (turn === "dealer" ? "Dealer" : "Fim de Jogo")}
                 </span>
               </div>
               <ScoreBoard
@@ -256,7 +361,7 @@ export default function Jogar() {
                 cards={dealerCards}
                 score={score(dealerCards)}
                 hidden={!revealDealer}
-                hideAll={dealerPlaying}
+                hideAll={false}
               />
               <ScoreBoard
                 title="Suas cartas"
@@ -282,7 +387,7 @@ export default function Jogar() {
                   }
                 />
               </div>
-              
+
               {gameOver && (
                 <button
                   onClick={resetGame}
